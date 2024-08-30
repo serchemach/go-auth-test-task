@@ -6,6 +6,9 @@ services:
         - action: sync
           path: .
           target: /app
+    ports:
+      - "${API_PORT}:${API_PORT}"
+
   postgres:
     build:
       context: ./postgres
