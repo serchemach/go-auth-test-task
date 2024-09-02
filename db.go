@@ -22,7 +22,7 @@ type User struct {
 }
 
 func createConn() (*pgxpool.Pool, error) {
-	connString := fmt.Sprintf("postgres://%s:%s@postgres:5432/sample", os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASSWORD"))
+	connString := fmt.Sprintf("postgres://%s:%s@127.0.0.1:5432/sample", os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASSWORD"))
 	conn, err := pgxpool.New(context.Background(), connString)
 
 	return conn, err

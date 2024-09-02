@@ -61,7 +61,11 @@ func main() {
 	}
 
 	router := gin.Default()
+	router.SetTrustedProxies(nil)
+	router.TrustedPlatform = "X-Forwarded-For"
+
 	router.GET("/auth", func(c *gin.Context) {
+		fmt.Printf("Request: %+v", c)
 		authHandler(db, c)
 	})
 

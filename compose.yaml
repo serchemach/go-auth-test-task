@@ -6,11 +6,15 @@ services:
         - action: sync
           path: .
           target: /app
-    ports:
-      - "${API_PORT}:${API_PORT}"
+    ports: 
+      - published: ${API_PORT}
+        target: ${API_PORT}
+        protocol: tcp
+        mode: host
     depends_on:
       postgres:
         condition: service_healthy
+    network_mode: host
 
   postgres:
     build:
@@ -29,6 +33,11 @@ services:
       interval: 2s
       timeout: 5s
       retries: 10
+    network_mode: host
 
 volumes:
   pgdata:
+
+networks:
+  internal:
+    driver: ipvlan
