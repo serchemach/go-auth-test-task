@@ -3,7 +3,8 @@ package main
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	// "github.com/google/uuid"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"net/http"
 	"os"
@@ -17,7 +18,19 @@ type tokenPair struct {
 
 const defaultAPIPort = 8000
 
-func authHandler(c *gin.Context) {
+func authHandler(db *pgxpool.Pool, c *gin.Context) {
+	id := c.Query("userId")
+	err := uuid.Validate(id)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "The user id is not a valid uuid")
+		return
+	}
+
+	_, err = getUser(db, id)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "User with given id does not exist")
+		return
+	}
 
 	c.IndentedJSON(http.StatusOK, tokenPair{
 		Access:  "123123",
@@ -37,6 +50,7 @@ func main() {
 		fmt.Printf("Unable to connect to database: %v\n", err)
 		os.Exit(1)
 	}
+	defer db.Close()
 
 	getUser(db, "462a75d9-96a4-4ff4-81c8-54b7fd06fbb2")
 
@@ -47,8 +61,11 @@ func main() {
 	}
 
 	router := gin.Default()
-	router.GET("/auth", authHandler)
+	router.GET("/auth", func(c *gin.Context) {
+		authHandler(db, c)
+	})
 
 	// not localhost because docker
 	router.Run(fmt.Sprintf("0.0.0.0:%d", apiPort))
+
 }

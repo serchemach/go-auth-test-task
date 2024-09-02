@@ -6,7 +6,14 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+type NoUserError struct{}
+
+func (m *NoUserError) Error() string {
+	return "No such users found"
+}
 
 type User struct {
 	Id    string `db:"id"`
@@ -14,19 +21,20 @@ type User struct {
 	Name  string `db:"name"`
 }
 
-func createConn() (*pgx.Conn, error) {
+func createConn() (*pgxpool.Pool, error) {
 	connString := fmt.Sprintf("postgres://%s:%s@postgres:5432/sample", os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASSWORD"))
-	conn, err := pgx.Connect(context.Background(), connString)
+	conn, err := pgxpool.New(context.Background(), connString)
 
 	return conn, err
 }
 
-func getUser(db *pgx.Conn, id string) (User, error) {
+func getUser(db *pgxpool.Pool, id string) (User, error) {
 	rows, _ := db.Query(context.Background(),
 		fmt.Sprintf("select * from auth_scheme.user where id = '%s'", id))
 	products, err := pgx.CollectRows(rows, pgx.RowToStructByName[User])
 	if err != nil {
 		fmt.Printf("CollectRows error: %v", err)
+		return User{Id: "", Name: "", Email: ""}, err
 	}
 
 	for _, p := range products {
@@ -37,5 +45,5 @@ func getUser(db *pgx.Conn, id string) (User, error) {
 		return products[0], nil
 	}
 
-	return User{Id: "", Name: "", Email: ""}, err
+	return User{Id: "", Name: "", Email: ""}, &NoUserError{}
 }
