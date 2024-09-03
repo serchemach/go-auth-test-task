@@ -18,11 +18,12 @@ type tokenPair struct {
 	Refresh string `json:"Refresh"`
 }
 
+const JWT_TTL = 10 * time.Second
+
 func accessFromParams(id string, ip string, jwtKey []byte) (string, error) {
-	ttl := 10 * time.Second
 	claims := jwt.MapClaims{
 		"userIp": ip,
-		"exp":    time.Now().UTC().Add(ttl).Unix(),
+		"exp":    time.Now().UTC().Add(JWT_TTL).Unix(),
 		"userID": id,
 	}
 	t := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
