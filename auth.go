@@ -13,6 +13,11 @@ import (
 	"time"
 )
 
+type tokenPair struct {
+	Access  string `json:"Access"`
+	Refresh string `json:"Refresh"`
+}
+
 func accessFromParams(id string, ip string, jwtKey []byte) (string, error) {
 	ttl := 10 * time.Second
 	claims := jwt.MapClaims{

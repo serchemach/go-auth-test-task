@@ -36,7 +36,7 @@ func main() {
 	}
 
 	refreshKey := os.Getenv("REFRESH_SECRET")
-	if jwtKey == "" {
+	if refreshKey == "" {
 		fmt.Printf("Refresh secret cannot be empty")
 		os.Exit(1)
 	}
