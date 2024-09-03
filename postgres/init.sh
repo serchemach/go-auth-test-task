@@ -18,4 +18,8 @@ psql -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d sample  <<-EOSQL
        ('f2621b78-312e-4b4c-b6d7-c21e371d05af', 'user4@mail.ru', 'user4'),
        ('0c62ea49-75d9-4750-8786-77e222dfd728', 'user5@mail.ru', 'user5'),
        ('5f0f0a8c-5741-49d0-bb56-8e42f674881f', 'user6@mail.ru', 'user6');
+
+     CREATE TABLE auth_scheme.expired_refresh (
+        token bytea primary key     
+    );
 EOSQL

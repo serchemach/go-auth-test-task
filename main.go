@@ -2,7 +2,7 @@ package main
 
 import (
 	// "crypto/rsa"
-	"crypto/sha1"
+	"crypto/sha512"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -25,8 +25,21 @@ type tokenPair struct {
 
 const defaultAPIPort = 8000
 
+func accessFromParams(id string, ip string, jwtKey []byte) (string, error) {
+	ttl := 10 * time.Second
+	claims := jwt.MapClaims{
+		"userIp": ip,
+		"exp":    time.Now().UTC().Add(ttl).Unix(),
+		"userID": id,
+	}
+	fmt.Println("CLAIMS:", claims)
+	t := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+
+	return t.SignedString(jwtKey)
+}
+
 func refreshFromAccess(accessToken string, refreshKey string) string {
-	hasher := sha1.New()
+	hasher := sha512.New()
 	hasher.Write([]byte(accessToken + refreshKey))
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
@@ -46,15 +59,7 @@ func authHandler(c *gin.Context, db *pgxpool.Pool, jwtKey []byte, refreshKey str
 		return
 	}
 
-	ttl := 10 * time.Second
-	claims := jwt.MapClaims{
-		"userIp": c.ClientIP(),
-		"exp":    time.Now().UTC().Add(ttl).Unix(),
-		"userID": id,
-	}
-	fmt.Println("CLAIMS:", claims)
-	t := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-	accessToken, err := t.SignedString(jwtKey)
+	accessToken, err := accessFromParams(id, c.ClientIP(), jwtKey)
 	if err != nil {
 		c.String(http.StatusInternalServerError, fmt.Sprintf("Error while generating the token: %v", err))
 		return
@@ -68,22 +73,48 @@ func authHandler(c *gin.Context, db *pgxpool.Pool, jwtKey []byte, refreshKey str
 	})
 }
 
-func refreshHandler(c *gin.Context, jwtKey []byte, refreshKey string) {
+func refreshHandler(c *gin.Context, jwtKey []byte, refreshKey string, db *pgxpool.Pool, salt string) {
 	accessToken := c.Query("Access")
 	token, err := jwt.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
 		return jwtKey, nil
 	})
 	fmt.Println("CLAIMS WHEN EXPIRED", token.Claims)
-	fmt.Printf("Error while parsing the token: %v", err)
+	fmt.Printf("Error while parsing the token: %v\n", err)
 	// Since expiration verification is done last, the token should still be valid even if it's expired
 	if err != nil && !errors.Is(err, jwt.ErrTokenExpired) {
 		c.String(http.StatusInternalServerError, fmt.Sprintf("Error while parsing the token: %v", err))
 		return
 	}
 
+	refreshToken := c.Query("Refresh")
+	if refreshFromAccess(accessToken, refreshKey) != refreshToken {
+		c.String(http.StatusInternalServerError, "Invalid refresh token for the access token")
+		return
+	}
+
+	isRefreshUsed, err := isRefreshTokenExpired(db, refreshToken, salt)
+	fmt.Printf("Refresh token %v: %s\n", isRefreshUsed, refreshToken)
+	if err != nil {
+		c.String(http.StatusInternalServerError, fmt.Sprintf("Error while checking the refresh token: %v", err))
+		return
+	} else if isRefreshUsed {
+		c.String(http.StatusInternalServerError, "The refresh token has already been used")
+		return
+	}
+
+	hexHash, err := tokenToHash(refreshToken, salt)
+	fmt.Printf("Refresh token hash in hex: %s\n", hexHash)
+	err = addNewExpiredRefreshToken(db, refreshToken, salt)
+
+	claims, _ := token.Claims.(jwt.MapClaims)
+	id, _ := claims["userID"]
+	newAccessToken, err := accessFromParams(fmt.Sprint(id), c.ClientIP(), jwtKey)
+
+	newRefreshToken := refreshFromAccess(newAccessToken, refreshKey)
+
 	c.IndentedJSON(http.StatusOK, tokenPair{
-		Access:  "sdds",
-		Refresh: "dsioaoidjf",
+		Access:  newAccessToken,
+		Refresh: newRefreshToken,
 	})
 }
 
@@ -91,6 +122,12 @@ func main() {
 	err := godotenv.Load()
 	if err != nil {
 		fmt.Printf("Error loading .env file: %v\n", err)
+		os.Exit(1)
+	}
+
+	salt := os.Getenv("SALT")
+	if salt == "" {
+		fmt.Printf("The salt can't be empty")
 		os.Exit(1)
 	}
 
@@ -157,7 +194,7 @@ func main() {
 
 	router.GET("/refresh", func(c *gin.Context) {
 		// fmt.Printf("Request: %+v", c)
-		refreshHandler(c, []byte(jwtKey), refreshKey)
+		refreshHandler(c, []byte(jwtKey), refreshKey, db, salt)
 	})
 
 	// not localhost because docker
