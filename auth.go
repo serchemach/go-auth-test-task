@@ -65,7 +65,7 @@ func authHandler(c *gin.Context, db *pgxpool.Pool, jwtKey []byte, refreshKey str
 	})
 }
 
-func refreshHandler(c *gin.Context, jwtKey []byte, refreshKey string, db *pgxpool.Pool, salt string) {
+func refreshHandler(c *gin.Context, jwtKey []byte, refreshKey string, db *pgxpool.Pool, salt string, creds Sender) {
 	accessToken := c.Query("Access")
 	token, err := jwt.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
 		return jwtKey, nil
@@ -96,6 +96,19 @@ func refreshHandler(c *gin.Context, jwtKey []byte, refreshKey string, db *pgxpoo
 	claims, _ := token.Claims.(jwt.MapClaims)
 	id, _ := claims["userID"]
 	newAccessToken, err := accessFromParams(fmt.Sprint(id), c.ClientIP(), jwtKey)
+
+	prevIp := fmt.Sprint(claims["userIp"])
+	if c.ClientIP() != prevIp {
+		user, err := getUser(db, fmt.Sprint(id))
+		if err != nil {
+			fmt.Printf("Error while fetching the user for sending mail : %s\n", err)
+		}
+
+		err = sendMail(user.Name+" refresh operation notification", "Your access token was refreshed from IP ("+c.ClientIP()+") differing the one it was given to ("+prevIp+")", user.Email, creds)
+		if err != nil {
+			fmt.Printf("Error while sending mail: %s\n", err)
+		}
+	}
 
 	newRefreshToken := refreshFromAccess(newAccessToken, refreshKey)
 

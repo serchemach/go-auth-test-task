@@ -38,9 +38,9 @@ func getUser(db *pgxpool.Pool, id string) (User, error) {
 		return User{Id: "", Name: "", Email: ""}, err
 	}
 
-	for _, p := range products {
-		fmt.Printf("%s: %s, %s\n", p.Id, p.Email, p.Name)
-	}
+	// for _, p := range products {
+	// 	fmt.Printf("%s: %s, %s\n", p.Id, p.Email, p.Name)
+	// }
 
 	if len(products) > 0 {
 		return products[0], nil
