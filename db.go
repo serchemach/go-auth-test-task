@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	// "golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/scrypt"
 	"os"
 )
@@ -67,7 +66,7 @@ func addNewExpiredRefreshToken(db *pgxpool.Pool, refreshToken string, salt strin
 		return err
 	}
 	query := fmt.Sprintf("insert into auth_scheme.expired_refresh values (decode('%s', 'hex'));", bytesHex)
-	fmt.Printf(query)
+	// fmt.Printf(query)
 	_, err = db.Query(context.Background(), query)
 
 	return err
@@ -80,7 +79,7 @@ func isRefreshTokenExpired(db *pgxpool.Pool, refreshToken string, salt string) (
 	}
 
 	query := fmt.Sprintf("select count(*) from auth_scheme.expired_refresh where token = decode('%s', 'hex');", bytesHex)
-	fmt.Printf(query)
+	// fmt.Printf(query)
 	var numberOfVals int
 	err = db.QueryRow(context.Background(), query).Scan(&numberOfVals)
 	if err != nil {
